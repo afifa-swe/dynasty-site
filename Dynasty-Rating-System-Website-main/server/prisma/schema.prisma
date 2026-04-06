@@ -1,0 +1,135 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Faction {
+  darkness
+  light
+}
+
+enum Tier {
+  legendary
+  noble
+  treasure
+}
+
+enum PurchaseSource {
+  website
+  telegram
+}
+
+enum ActivityType {
+  purchase
+  adjustment
+  manual_add
+  rule_change
+}
+
+enum IngestStatus {
+  success
+  error
+}
+
+model User {
+  id              String           @id @default(cuid())
+  nickname        String
+  phone           String?          @unique
+  rating          Int              @default(0)
+  rank            Int              @default(0)
+  faction         Faction
+  tier            Tier             @default(treasure)
+  avatar          String?
+  joinDate        DateTime         @default(now())
+  purchases       Int              @default(0)
+  achievements    String[]         @default([])
+  lastPurchaseAt  DateTime?
+  lastActive      DateTime?
+  preferredChannel PurchaseSource?
+  totalVolume     Int              @default(0) // store dollars or cents consistently
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  purchasesRel    Purchase[]
+  ratingHistory   RatingSnapshot[]
+  activityLog     ActivityLog[]
+  ingestEvents    IngestEvent[]
+  rankHistory     RankHistory[]
+}
+
+model Purchase {
+  id                String         @id @default(cuid())
+  userId            String
+  user              User           @relation(fields: [userId], references: [id])
+  amount            Int            // store dollars or cents consistently
+  orderId           String?        @unique
+  source            PurchaseSource
+  items             String[]       @default([])
+  factionPreference Faction?
+  ratingDelta       Int?
+  createdAt         DateTime       @default(now())
+}
+
+model RatingSnapshot {
+  id        String          @id @default(cuid())
+  userId    String
+  user      User            @relation(fields: [userId], references: [id])
+  rating    Int
+  source    PurchaseSource?
+  amount    Int?
+  timestamp DateTime        @default(now())
+}
+
+model ActivityLog {
+  id            String         @id @default(cuid())
+  type          ActivityType
+  userId        String?
+  user          User?          @relation(fields: [userId], references: [id])
+  userNickname  String
+  description   String
+  source        PurchaseSource?
+  amount        Int?
+  delta         Int?
+  timestamp     DateTime       @default(now())
+}
+
+model Rules {
+  id                   Int    @id @default(1)
+  basePointsPerDollar  Int
+  websiteBonusPercent  Int
+  telegramBonusPercent Int
+  highValueThreshold   Int
+  highValueBonusPercent Int
+  decayPerDay          Int
+  updatedAt            DateTime @updatedAt
+}
+
+model IngestEvent {
+  id         String         @id @default(cuid())
+  source     PurchaseSource
+  status     IngestStatus
+  orderId    String?
+  nickname   String?
+  phone      String?
+  amount     Int?
+  items      String[]       @default([])
+  rawPayload Json
+  errorMessage String?
+  userId     String?
+  user       User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
+  createdAt  DateTime       @default(now())
+}
+
+model RankHistory {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fromRank  Int
+  toRank    Int
+  rating    Int
+  timestamp DateTime @default(now())
+}

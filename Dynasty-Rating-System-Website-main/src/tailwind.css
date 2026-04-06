@@ -1,0 +1,293 @@
+@import "tailwindcss";
+
+/* Leaderboard tabs */
+.leaderboard-tabs [data-slot="tabs-trigger"] {
+  color: #f1d9a1;
+  background: rgba(15, 23, 42, 0.82);
+  border: 1px solid rgba(180, 83, 9, 0.45);
+  border-radius: 0.75rem;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 1px 6px rgba(15, 23, 42, 0.55);
+  transition: transform 180ms ease, color 180ms ease, background 200ms ease, border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.leaderboard-tabs [data-slot="tabs-trigger"]:hover {
+  color: #fff4d1;
+  background: linear-gradient(90deg, rgba(245, 158, 11, 0.38) 0%, rgba(245, 158, 11, 0.18) 100%);
+  border-color: rgba(245, 158, 11, 0.85);
+  box-shadow: 0 0 14px rgba(245, 158, 11, 0.45);
+  transform: translateY(-1px);
+}
+
+.leaderboard-tabs [data-slot="tabs-trigger"][data-state="active"] {
+  color: #fff7db;
+  background: linear-gradient(90deg, rgba(245, 158, 11, 0.45) 0%, rgba(245, 158, 11, 0.2) 100%);
+  border-color: rgba(245, 158, 11, 0.95);
+  box-shadow: 0 0 18px rgba(245, 158, 11, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+
+.leaderboard-tabs [data-slot="tabs-trigger"][data-state="active"]:hover {
+  background: linear-gradient(90deg, rgba(245, 158, 11, 0.55) 0%, rgba(245, 158, 11, 0.26) 100%);
+  box-shadow: 0 0 22px rgba(245, 158, 11, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+}
+
+.leaderboard-tabs [data-slot="tabs-trigger"]:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.75), 0 0 14px rgba(245, 158, 11, 0.45);
+}
+
+.dynasty-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(251, 191, 36, 0.7) rgba(20, 26, 44, 0.6);
+}
+
+.dynasty-scrollbar::-webkit-scrollbar {
+  width: 10px;
+}
+
+.dynasty-scrollbar::-webkit-scrollbar-track {
+  background: rgba(20, 26, 44, 0.55);
+  border-radius: 999px;
+}
+
+.dynasty-scrollbar::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(253, 224, 71, 0.95), rgba(245, 158, 11, 0.75));
+  border-radius: 999px;
+  border: 2px solid rgba(20, 26, 44, 0.55);
+}
+
+.dynasty-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, rgba(254, 243, 199, 0.95), rgba(251, 191, 36, 0.8));
+}
+
+@keyframes dynasty-scroll-card-enter {
+  0% {
+    opacity: 0;
+    transform: translateY(-18px) scale(0.94);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes dynasty-scroll-card-king-glow {
+  0%,
+  100% {
+    opacity: 0.42;
+    transform: scale(0.98);
+  }
+
+  50% {
+    opacity: 0.7;
+    transform: scale(1.03);
+  }
+}
+
+@keyframes dynasty-tree-halo {
+  0%,
+  100% {
+    opacity: 0.24;
+    transform: scale(0.985);
+  }
+
+  50% {
+    opacity: 0.34;
+    transform: scale(1.01);
+  }
+}
+
+@keyframes dynasty-tree-aura-drift {
+  0%,
+  100% {
+    transform: translate3d(-1.2%, 0.6%, 0) scale(0.985) rotate(-0.8deg);
+  }
+
+  50% {
+    transform: translate3d(1.2%, -1%, 0) scale(1.02) rotate(0.8deg);
+  }
+}
+
+@keyframes dynasty-tree-aura-core {
+  0%,
+  100% {
+    transform: translate3d(0, 0.4%, 0) scale(0.98);
+  }
+
+  50% {
+    transform: translate3d(0, -1.1%, 0) scale(1.04);
+  }
+}
+
+@keyframes dynasty-tree-image-glow-back {
+  0%,
+  100% {
+    transform: translate3d(-0.8%, 0.9%, 0) scale(1.02);
+  }
+
+  50% {
+    transform: translate3d(0.9%, -1.2%, 0) scale(1.04);
+  }
+}
+
+@keyframes dynasty-tree-image-glow-mid {
+  0%,
+  100% {
+    transform: translate3d(0.4%, 0.5%, 0) scale(1.01);
+  }
+
+  50% {
+    transform: translate3d(-0.5%, -0.8%, 0) scale(1.03);
+  }
+}
+
+@keyframes dynasty-tree-image-glow-spark {
+  0%,
+  100% {
+    transform: translate3d(0.3%, 0.4%, 0) scale(1.008);
+  }
+
+  50% {
+    transform: translate3d(-0.4%, -0.6%, 0) scale(1.02);
+  }
+}
+
+@keyframes dynasty-scroll-card-hover-aura {
+  0%,
+  100% {
+    opacity: 0.4;
+    transform: scale(0.98);
+  }
+
+  50% {
+    opacity: 0.75;
+    transform: scale(1.03);
+  }
+}
+
+.dynasty-scroll-card {
+  transform-origin: center;
+  transition: transform 160ms ease, box-shadow 160ms ease, opacity 160ms ease;
+}
+
+.dynasty-scroll-card.interactive:hover {
+  transform: translateY(-3px) scale(1.02);
+}
+
+.dynasty-scroll-card.interactive:active {
+  transform: scale(0.98);
+}
+
+.dynasty-scroll-card-enter {
+  animation: dynasty-scroll-card-enter 320ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.dynasty-scroll-card-king-glow {
+  animation: dynasty-scroll-card-king-glow 2.4s ease-in-out infinite;
+}
+
+.dynasty-tree-halo {
+  animation: dynasty-tree-halo 6s ease-in-out infinite;
+}
+
+.dynasty-tree-aura,
+.dynasty-tree-aura-core,
+.dynasty-tree-image-glow,
+.dynasty-tree-mobile-aura,
+.dynasty-tree-desktop-canopy,
+.dynasty-scroll-card-hover-aura {
+  will-change: transform, opacity;
+  transform: translateZ(0);
+}
+
+.dynasty-tree-effect-fade {
+  transition: opacity 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.dynasty-tree-effect-fade-desktop {
+  transition-property: opacity, top, right, bottom, left;
+  transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.dynasty-tree-effect-fade-mobile {
+  transition: opacity 420ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.dynasty-tree-aura-desktop {
+  animation: dynasty-tree-aura-drift 8.2s ease-in-out infinite;
+}
+
+.dynasty-tree-aura-mobile {
+  animation: dynasty-tree-aura-drift 11s ease-in-out infinite;
+}
+
+.dynasty-tree-aura-core-desktop {
+  animation: dynasty-tree-aura-core 5.8s ease-in-out infinite;
+}
+
+.dynasty-tree-aura-core-mobile {
+  animation: dynasty-tree-aura-core 7.4s ease-in-out infinite;
+}
+
+.dynasty-tree-image-glow-back {
+  animation: dynasty-tree-image-glow-back 9.6s ease-in-out infinite;
+}
+
+.dynasty-tree-image-glow-mid {
+  animation: dynasty-tree-image-glow-mid 6.4s ease-in-out infinite;
+}
+
+.dynasty-tree-image-glow-spark {
+  animation: dynasty-tree-image-glow-spark 5.2s ease-in-out infinite;
+}
+
+.dynasty-tree-image-glow-mobile {
+  animation: dynasty-tree-image-glow-mid 7.2s ease-in-out infinite;
+}
+
+.dynasty-tree-desktop-canopy {
+  animation: dynasty-tree-aura-core 7.8s ease-in-out infinite;
+}
+
+.dynasty-tree-mobile-aura {
+  animation: dynasty-tree-aura-core 6.6s ease-in-out infinite;
+}
+
+.dynasty-scroll-card-hover-aura {
+  background:
+    radial-gradient(circle at center, rgba(255, 244, 200, 0.18) 0%, rgba(251, 191, 36, 0.14) 34%, rgba(245, 158, 11, 0.08) 56%, rgba(15, 23, 42, 0) 82%);
+  filter: blur(16px);
+  animation: dynasty-scroll-card-hover-aura 3.6s ease-in-out infinite;
+}
+
+.dynasty-tree-surface,
+.dynasty-tree-surface * {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.dynasty-tree-surface-dragging,
+.dynasty-tree-surface-dragging * {
+  user-select: none !important;
+  -webkit-user-select: none !important;
+}
+
+.dynasty-tree-surface-dragging .dynasty-scroll-card,
+.dynasty-tree-surface-dragging .dynasty-scroll-card * {
+  transition: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dynasty-tree-aura-desktop,
+  .dynasty-tree-aura-mobile,
+  .dynasty-tree-aura-core-desktop,
+  .dynasty-tree-aura-core-mobile,
+  .dynasty-tree-image-glow-back,
+  .dynasty-tree-image-glow-mid,
+  .dynasty-tree-image-glow-spark,
+  .dynasty-tree-image-glow-mobile,
+  .dynasty-tree-desktop-canopy,
+  .dynasty-tree-mobile-aura,
+  .dynasty-scroll-card-hover-aura {
+    animation: none;
+  }
+}
