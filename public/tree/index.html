@@ -1,16 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dynasty - Living Tree (2D)</title>
+  <link rel="stylesheet" href="/tree/style.css" />
+</head>
+<body>
+  <canvas id="tree-canvas"></canvas>
 
-  <!DOCTYPE html>
-  <html lang="en">
-    <head>
-      <meta charset="UTF-8" />
-      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-      <title>Dynasty Rating System Website</title>
-      <script type="module" crossorigin src="/tree/assets/index-BsGl7zfg.js"></script>
-      <link rel="stylesheet" crossorigin href="/tree/assets/index-P5T4CxzW.css">
-    </head>
+  <img id="tree-silhouette-image" src="/tree/tree-silhouette.png" alt="Tree silhouette" style="display:none" />
 
-    <body>
-      <div id="root"></div>
-    </body>
-  </html>
-  
+  <div class="ui">
+    <div class="badge">Dynasty Living Tree</div>
+    <div class="controls">
+      <button id="reset">Reset View</button>
+    </div>
+  </div>
+  <script src="/tree/tree2d.js"></script>
+</body>
+</html>
