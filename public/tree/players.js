@@ -1,15 +1,8 @@
-/**
- * Dynasty Living Tree — слой игроков поверх Canvas-анимации
- * Загружает данные из /api/tree и рисует узлы дерева с SVG
- */
-
 (function () {
   'use strict';
 
-  // Адрес API бэкенда
   const API_BASE = 'http://127.0.0.1:4000';
 
-  // DOM-элементы
   const overlay = document.getElementById('players-overlay');
   const popup = document.getElementById('player-popup');
   const popupContent = document.getElementById('popup-content');
@@ -19,22 +12,16 @@
   const errorDetail = document.getElementById('error-detail');
   const retryBtn = document.getElementById('retry-btn');
 
-  // Состояние камеры (синхронизируется с tree2d.js)
-  let camX = 0, camY = -40, camScale = 1;
   let viewW = window.innerWidth, viewH = window.innerHeight;
-
-  // Массив плоских узлов для рендера
   let flatNodes = [];
   let treeData = [];
 
-  // Мобильная адаптация: уменьшаем размеры на маленьких экранах
   function isMobile() { return window.innerWidth <= 600; }
   function getNodeRadius() { return isMobile() ? 16 : 24; }
-  function getLevelHeight() { return isMobile() ? 70 : 100; }
-  function getMinGap() { return isMobile() ? 10 : 16; }
+  function getLevelHeight() { return isMobile() ? 90 : 120; }
+  function getMinGap() { return isMobile() ? 30 : 44; }
   function getRootExtraRadius() { return isMobile() ? 5 : 8; }
-
-  // === Утилиты ===
+  function getMaxNameLength() { return isMobile() ? 8 : 12; }
 
   function getInitials(name) {
     return name.split(/\s+/).map(w => w[0]).join('').toUpperCase().slice(0, 2);
@@ -53,20 +40,18 @@
     return faction === 'darkness' ? 'Darkness' : 'Light';
   }
 
-  // === Раскладка дерева ===
+  function truncateName(name) {
+    const max = getMaxNameLength();
+    if (name.length <= max) return name;
+    return name.slice(0, max - 1) + '\u2026';
+  }
 
-  /**
-   * Рекурсивно раскладывает узлы дерева сверху вниз
-   * Корень вверху, дети ниже. Используем простой алгоритм Рейнгольда-Тилфорда
-   */
   function layoutTree(roots) {
     const NODE_RADIUS = getNodeRadius();
     const LEVEL_HEIGHT = getLevelHeight();
     const MIN_GAP = getMinGap();
     const flat = [];
-    let nextX = 0;
 
-    // Считаем ширину поддерева (количество листьев)
     function subtreeWidth(node) {
       if (!node.children || node.children.length === 0) return 1;
       let w = 0;
@@ -76,13 +61,11 @@
       return w;
     }
 
-    // Рекурсивная раскладка
     function layout(node, depth, leftBound) {
       const width = subtreeWidth(node);
       const spacing = (NODE_RADIUS * 2 + MIN_GAP);
 
       if (!node.children || node.children.length === 0) {
-        // Лист — ставим в следующую свободную позицию
         const x = leftBound + spacing / 2;
         const y = depth * LEVEL_HEIGHT;
         flat.push({
@@ -94,7 +77,6 @@
         return { x, width: spacing };
       }
 
-      // Раскладываем детей
       let childLeft = leftBound;
       const childPositions = [];
       for (const child of node.children) {
@@ -103,7 +85,6 @@
         childLeft += subtreeWidth(child) * spacing;
       }
 
-      // Центрируем родителя над детьми
       const firstChildX = childPositions[0].x;
       const lastChildX = childPositions[childPositions.length - 1].x;
       const x = (firstChildX + lastChildX) / 2;
@@ -112,14 +93,13 @@
       flat.push({
         ...node,
         x, y,
-        radius: NODE_RADIUS + (depth === 0 ? getRootExtraRadius() : 0), // корень чуть больше
+        radius: NODE_RADIUS + (depth === 0 ? getRootExtraRadius() : 0),
         depth
       });
 
       return { x, width: width * spacing };
     }
 
-    // Раскладываем все корни рядом
     let currentLeft = 0;
     const spacing = (NODE_RADIUS * 2 + MIN_GAP);
     for (const root of roots) {
@@ -128,12 +108,11 @@
       currentLeft += w + spacing;
     }
 
-    // Центрируем относительно (0, 0)
     if (flat.length > 0) {
       const minX = Math.min(...flat.map(n => n.x));
       const maxX = Math.max(...flat.map(n => n.x));
       const centerX = (minX + maxX) / 2;
-      const offsetY = -80; // Начинаем чуть выше
+      const offsetY = -80;
       for (const node of flat) {
         node.x -= centerX;
         node.y += offsetY;
@@ -143,29 +122,32 @@
     return flat;
   }
 
-  // === Рендер SVG ===
+  function getCamera() {
+    const cam = window._treeCamera;
+    if (cam) return cam;
+    return { x: 0, y: -40, scale: 1 };
+  }
 
   function renderTree() {
     if (!flatNodes.length) return;
+
+    const cam = getCamera();
 
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svg.setAttribute('viewBox', `0 0 ${viewW} ${viewH}`);
     svg.style.width = '100%';
     svg.style.height = '100%';
 
-    // Группа с трансформацией камеры
     const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-    const tx = viewW / 2 + camX * camScale;
-    const ty = viewH / 2 + camY * camScale;
-    g.setAttribute('transform', `translate(${tx}, ${ty}) scale(${camScale})`);
+    const tx = viewW / 2 + cam.x * cam.scale;
+    const ty = viewH / 2 + cam.y * cam.scale;
+    g.setAttribute('transform', `translate(${tx}, ${ty}) scale(${cam.scale})`);
 
-    // Карта id -> позиция для линий
     const posMap = {};
     for (const node of flatNodes) {
       posMap[node.id] = { x: node.x, y: node.y };
     }
 
-    // Рисуем линии связей
     for (const node of flatNodes) {
       if (node.parent_id && posMap[node.parent_id]) {
         const parent = posMap[node.parent_id];
@@ -177,14 +159,12 @@
       }
     }
 
-    // Рисуем узлы
     for (const node of flatNodes) {
       const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
       group.setAttribute('class', 'tree-node');
       group.setAttribute('data-id', node.id);
       group.style.cursor = 'pointer';
 
-      // Круг узла
       const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
       circle.setAttribute('cx', node.x);
       circle.setAttribute('cy', node.y);
@@ -192,7 +172,6 @@
       circle.setAttribute('class', `node-circle ${node.tier}`);
       group.appendChild(circle);
 
-      // Аватар или инициалы
       if (node.avatar_url) {
         const img = document.createElementNS('http://www.w3.org/2000/svg', 'image');
         img.setAttribute('href', node.avatar_url);
@@ -205,7 +184,6 @@
         group.appendChild(img);
       }
 
-      // Инициалы поверх (если аватар не загрузится)
       const initials = document.createElementNS('http://www.w3.org/2000/svg', 'text');
       initials.setAttribute('x', node.x);
       initials.setAttribute('y', node.y);
@@ -213,15 +191,13 @@
       initials.textContent = getInitials(node.name);
       group.appendChild(initials);
 
-      // Имя под узлом
       const nameEl = document.createElementNS('http://www.w3.org/2000/svg', 'text');
       nameEl.setAttribute('x', node.x);
       nameEl.setAttribute('y', node.y + node.radius + 14);
       nameEl.setAttribute('class', 'node-name');
-      nameEl.textContent = node.name;
+      nameEl.textContent = truncateName(node.name);
       group.appendChild(nameEl);
 
-      // Рейтинг
       const ratingEl = document.createElementNS('http://www.w3.org/2000/svg', 'text');
       ratingEl.setAttribute('x', node.x);
       ratingEl.setAttribute('y', node.y + node.radius + 26);
@@ -229,7 +205,6 @@
       ratingEl.textContent = formatNumber(node.rating) + ' pts';
       group.appendChild(ratingEl);
 
-      // Бейдж ранга
       if (node.rank <= 3) {
         const rankBadge = document.createElementNS('http://www.w3.org/2000/svg', 'text');
         rankBadge.setAttribute('x', node.x + node.radius - 2);
@@ -241,7 +216,6 @@
         group.appendChild(rankBadge);
       }
 
-      // Обработчик клика
       group.addEventListener('click', (e) => {
         e.stopPropagation();
         showPopup(node);
@@ -255,7 +229,18 @@
     overlay.appendChild(svg);
   }
 
-  // === Попап профиля ===
+  let lastCamX = NaN, lastCamY = NaN, lastCamScale = NaN;
+
+  function syncLoop() {
+    const cam = getCamera();
+    if (cam.x !== lastCamX || cam.y !== lastCamY || cam.scale !== lastCamScale) {
+      lastCamX = cam.x;
+      lastCamY = cam.y;
+      lastCamScale = cam.scale;
+      renderTree();
+    }
+    requestAnimationFrame(syncLoop);
+  }
 
   function showPopup(node) {
     const avatarHtml = node.avatar_url
@@ -302,7 +287,6 @@
       ${achievementsHtml}
     `;
 
-    // Показать backdrop
     let backdrop = document.querySelector('.popup-backdrop');
     if (!backdrop) {
       backdrop = document.createElement('div');
@@ -325,128 +309,8 @@
     if (e.key === 'Escape') hidePopup();
   });
 
-  // === Синхронизация камеры с tree2d.js ===
+  overlay.style.pointerEvents = 'none';
 
-  // tree2d.js использует глобальную переменную camera через замыкание
-  // Мы перехватываем события pan/zoom и повторяем трансформацию
-  let dragActive = false;
-  let lastPointerX = 0, lastPointerY = 0;
-
-  const canvas = document.getElementById('tree-canvas');
-
-  // Перехватываем события на overlay (он поверх canvas)
-  overlay.style.pointerEvents = 'auto';
-
-  overlay.addEventListener('pointerdown', (e) => {
-    if (e.target.closest('.tree-node')) return; // клик по узлу — не drag
-    dragActive = true;
-    lastPointerX = e.clientX;
-    lastPointerY = e.clientY;
-    overlay.setPointerCapture(e.pointerId);
-    overlay.style.cursor = 'grabbing';
-
-    // Пробрасываем событие на canvas
-    canvas.dispatchEvent(new PointerEvent('pointerdown', {
-      clientX: e.clientX, clientY: e.clientY,
-      pointerId: e.pointerId, bubbles: true
-    }));
-  });
-
-  overlay.addEventListener('pointermove', (e) => {
-    if (dragActive) {
-      const dx = (e.clientX - lastPointerX) / camScale;
-      const dy = (e.clientY - lastPointerY) / camScale;
-      camX += dx;
-      camY += dy;
-      lastPointerX = e.clientX;
-      lastPointerY = e.clientY;
-      renderTree();
-    }
-
-    // Пробрасываем на canvas
-    canvas.dispatchEvent(new PointerEvent('pointermove', {
-      clientX: e.clientX, clientY: e.clientY,
-      pointerId: e.pointerId, bubbles: true
-    }));
-  });
-
-  overlay.addEventListener('pointerup', (e) => {
-    if (dragActive) {
-      dragActive = false;
-      try { overlay.releasePointerCapture(e.pointerId); } catch (_) {}
-      overlay.style.cursor = 'grab';
-    }
-
-    canvas.dispatchEvent(new PointerEvent('pointerup', {
-      clientX: e.clientX, clientY: e.clientY,
-      pointerId: e.pointerId, bubbles: true
-    }));
-  });
-
-  overlay.addEventListener('wheel', (e) => {
-    e.preventDefault();
-    const factor = Math.exp(-e.deltaY * 0.0012);
-    const mx = (e.offsetX - viewW / 2) / camScale - camX;
-    const my = (e.offsetY - viewH / 2) / camScale - camY;
-    camScale *= factor;
-    camX += mx - mx * factor;
-    camY += my - my * factor;
-    renderTree();
-
-    // Пробрасываем на canvas
-    canvas.dispatchEvent(new WheelEvent('wheel', {
-      clientX: e.clientX, clientY: e.clientY,
-      deltaX: e.deltaX, deltaY: e.deltaY, deltaMode: e.deltaMode,
-      bubbles: true
-    }));
-  }, { passive: false });
-
-  // Pinch-to-zoom на overlay (мобильные)
-  let overlayPinchDist = 0;
-  let overlayPinchScale = 1;
-
-  overlay.addEventListener('touchstart', (e) => {
-    if (e.touches.length === 2) {
-      e.preventDefault();
-      dragActive = false;
-      const t0 = e.touches[0], t1 = e.touches[1];
-      overlayPinchDist = Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY);
-      overlayPinchScale = camScale;
-    }
-  }, { passive: false });
-
-  overlay.addEventListener('touchmove', (e) => {
-    if (e.touches.length === 2 && overlayPinchDist > 0) {
-      e.preventDefault();
-      const t0 = e.touches[0], t1 = e.touches[1];
-      const dist = Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY);
-      const newScale = overlayPinchScale * (dist / overlayPinchDist);
-      const cx = (t0.clientX + t1.clientX) / 2;
-      const cy = (t0.clientY + t1.clientY) / 2;
-      const mx = (cx - viewW / 2) / camScale - camX;
-      const my = (cy - viewH / 2) / camScale - camY;
-      const factor = newScale / camScale;
-      camScale = newScale;
-      camX += mx - mx * factor;
-      camY += my - my * factor;
-      renderTree();
-
-      // Синхронизируем canvas
-      canvas.dispatchEvent(new CustomEvent('_pinchSync', { detail: { camX, camY, camScale } }));
-    }
-  }, { passive: false });
-
-  overlay.addEventListener('touchend', () => { overlayPinchDist = 0; });
-
-  // Reset view
-  document.getElementById('reset').addEventListener('click', () => {
-    camX = 0;
-    camY = -40;
-    camScale = 1;
-    renderTree();
-  });
-
-  // Resize — пересчитываем раскладку при смене ориентации/размера
   let lastIsMobile = isMobile();
   window.addEventListener('resize', () => {
     viewW = window.innerWidth;
@@ -458,8 +322,6 @@
     }
     renderTree();
   });
-
-  // === Загрузка данных ===
 
   function showLoading() {
     loadingOverlay.classList.remove('hidden');
@@ -489,11 +351,10 @@
         throw new Error('No players found in the dynasty tree');
       }
 
-      // Раскладка
       flatNodes = layoutTree(treeData);
-
       hideLoading();
       renderTree();
+      syncLoop();
     } catch (err) {
       console.error('Failed to load tree:', err);
       showError(err.message || 'Network error');
@@ -501,8 +362,6 @@
   }
 
   retryBtn.addEventListener('click', loadTree);
-
-  // Запуск
   loadTree();
 
 })();

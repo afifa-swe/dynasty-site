@@ -30,6 +30,9 @@ const init = async () => {
   const defaultCam = { x: 0, y: -40, scale: 1 };
   Object.assign(camera, defaultCam);
 
+  // Expose camera globally so players overlay can sync with it
+  window._treeCamera = camera;
+
   let hoveredScroll = null;
   let activeScroll = null;
 
