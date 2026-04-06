@@ -1,73 +1,104 @@
-# Welcome to your Lovable project
+# Dynasty
 
-## Project info
+Сайт-витрина streetwear бренда **Dynasty** (СПб) с каталогом одежды, предзаказом через Telegram-бот и рейтинговой системой игроков.
 
-**URL**: https://lovable.dev/projects/f3c88b14-f544-4c57-8207-9ed375b290c2
+## Стек
 
-## How can I edit this code?
+**Фронтенд**: Vite 5 + React 18 + TypeScript + Tailwind CSS + shadcn/ui
 
-There are several ways of editing your application.
+**Бэкенд**: Laravel 13 + PHP 8.3 + Eloquent ORM + PostgreSQL
 
-**Use Lovable**
+**Дополнительно**: Telegram-бот, Canvas-визуализация дерева игроков
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/f3c88b14-f544-4c57-8207-9ed375b290c2) and start prompting.
+## Быстрый старт
 
-Changes made via Lovable will be committed automatically to this repo.
+### Фронтенд
 
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+```bash
+npm install
+npm run dev          # http://localhost:8080
 ```
 
-**Edit a file directly in GitHub**
+### Бэкенд
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+```bash
+cd server
+composer install
+cp .env.example .env
+php artisan key:generate
+php artisan migrate
+php artisan serve --port=4000   # http://localhost:4000
+```
 
-**Use GitHub Codespaces**
+Или одной командой:
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+```bash
+cd server && composer run setup
+composer run dev
+```
 
-## What technologies are used for this project?
+### Переменные окружения
 
-This project is built with:
+**Корень** (`.env`):
+```
+VITE_API_BASE=http://127.0.0.1:4000
+```
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+**Бэкенд** (`server/.env`):
+```
+DB_CONNECTION=pgsql
+DB_DATABASE=dynasty
+TELEGRAM_BOT_TOKEN=             # опционально
+ADMIN_API_TOKEN=                # токен для админ-API
+```
 
-## How can I deploy this project?
+## Структура
 
-Simply open [Lovable](https://lovable.dev/projects/f3c88b14-f544-4c57-8207-9ed375b290c2) and click on Share -> Publish.
+```
+dynasty-site/
+├── src/                        # React-приложение
+│   ├── components/             # Header, Hero, Catalog, About, Footer, ProductCard
+│   ├── components/ui/          # shadcn/ui (60+ компонентов)
+│   ├── pages/                  # Index, ProductDetail, Rating, NotFound
+│   ├── hooks/                  # use-mobile, use-toast
+│   └── lib/                    # утилиты
+├── public/
+│   ├── images/                 # фото товаров и фоны
+│   └── tree/                   # Canvas-приложение Dynasty Living Tree
+│       ├── index.html
+│       ├── tree2d.js           # Canvas-рендеринг дерева
+│       ├── players.js          # SVG-оверлей игроков
+│       └── style.css
+├── server/                     # Laravel API
+│   ├── app/Http/Controllers/Api/   # AdminController, IngestController, PlayerController, RatingController, TreeController
+│   ├── app/Models/             # Player, Purchase, ActivityLog, ScoringRule, Order...
+│   ├── app/Services/           # RatingService, TelegramBotService
+│   ├── database/migrations/
+│   └── routes/api.php          # все API-маршруты
+└── Dynasty-Rating-System-Website-main/  # старая реализация (Express + Prisma)
+```
 
-## Can I connect a custom domain to my Lovable project?
+## Основные возможности
 
-Yes, you can!
+- Каталог из 6 товаров (худи, штаны, комплекты) с фото-слайдером
+- Предзаказ через Telegram-бот (`@dynastyspbshop_bot`)
+- Рейтинговая система с фракциями (Darkness / Light), тирами (Legendary / Noble / Treasure) и достижениями
+- Интерактивное дерево игроков на Canvas с pan/zoom
+- Админ-API для управления игроками, правилами и аналитикой
+- Приём покупок с сайта и из Telegram с автоматическим начислением рейтинга
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+## API
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+Все эндпоинты имеют префикс `/api`. Админские эндпоинты защищены заголовком `X-Admin-Token`.
+
+Подробная документация API — в [CLAUDE.md](CLAUDE.md).
+
+## Скрипты
+
+| Команда | Описание |
+|---------|----------|
+| `npm run dev` | Dev-сервер фронтенда (порт 8080) |
+| `npm run build` | Production-сборка в `dist/` |
+| `npm run lint` | ESLint |
+| `composer run dev` | Dev-сервер бэкенда (concurrent) |
+| `composer run test` | PHPUnit тесты |
