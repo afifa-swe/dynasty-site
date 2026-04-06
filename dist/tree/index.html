@@ -1,16 +1,52 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dynasty - Living Tree</title>
+  <link rel="stylesheet" href="/tree/style.css" />
+</head>
+<body>
+  <!-- Фоновый Canvas с анимацией дерева -->
+  <canvas id="tree-canvas"></canvas>
+  <img id="tree-silhouette-image" src="/tree/tree-silhouette.png" alt="Tree silhouette" style="display:none" />
 
-  <!DOCTYPE html>
-  <html lang="en">
-    <head>
-      <meta charset="UTF-8" />
-      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-      <title>Dynasty Rating System Website</title>
-      <script type="module" crossorigin src="/tree/assets/index-BsGl7zfg.js"></script>
-      <link rel="stylesheet" crossorigin href="/tree/assets/index-P5T4CxzW.css">
-    </head>
+  <!-- UI: бейдж и контролы -->
+  <div class="ui">
+    <div class="badge">Dynasty Living Tree</div>
+    <div class="controls">
+      <button id="reset">Reset View</button>
+    </div>
+  </div>
 
-    <body>
-      <div id="root"></div>
-    </body>
-  </html>
-  
+  <!-- Оверлей с игроками (SVG поверх Canvas) -->
+  <div id="players-overlay"></div>
+
+  <!-- Попап профиля игрока -->
+  <div id="player-popup" class="popup hidden">
+    <button id="popup-close" class="popup-close">&times;</button>
+    <div id="popup-content"></div>
+  </div>
+
+  <!-- Loading состояние -->
+  <div id="loading-overlay" class="loading-overlay">
+    <div class="loading-spinner"></div>
+    <p class="loading-text">Loading dynasty tree...</p>
+  </div>
+
+  <!-- Error состояние -->
+  <div id="error-overlay" class="error-overlay hidden">
+    <div class="error-content">
+      <div class="error-icon">!</div>
+      <p class="error-text">Could not load the dynasty tree</p>
+      <p class="error-detail" id="error-detail"></p>
+      <button id="retry-btn" class="retry-btn">Retry</button>
+    </div>
+  </div>
+
+  <!-- Фоновая анимация -->
+  <script src="/tree/tree2d.js"></script>
+  <!-- Логика игроков -->
+  <script src="/tree/players.js"></script>
+</body>
+</html>
