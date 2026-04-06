@@ -372,7 +372,7 @@ const ProductDetail = () => {
       return;
     }
     let startParam = product.id + `_${selectedSize}`;
-    window.open(`https://t.me/dynastyspbshop_bot?start=${startParam}`, '_blank');
+    window.open(`https://t.me/dynasty_site_bot?start=${startParam}`, '_blank');
   };
 
   return (
