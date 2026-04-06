@@ -142,17 +142,19 @@ const FullscreenImageViewer = ({ src, alt, isOpen, onClose }: { src: string; alt
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-black flex items-center justify-center">
+    <div className="fixed inset-0 z-50 bg-black flex items-center justify-center" style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', touchAction: 'none' }}>
       <button
         onClick={onClose}
-        className="absolute top-4 right-4 text-white text-xl z-10 p-2"
+        className="absolute top-4 right-4 text-white text-xl z-10 p-4"
+        style={{ minWidth: '44px', minHeight: '44px' }}
       >
         ✕
       </button>
-      <div 
+      <div
         className="w-full h-full flex items-center justify-center"
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
+        style={{ touchAction: 'none' }}
       >
         <ImageWithFallback
           ref={imageRef}
@@ -161,7 +163,8 @@ const FullscreenImageViewer = ({ src, alt, isOpen, onClose }: { src: string; alt
           className="max-w-full max-h-full object-contain"
           style={{
             transform: `scale(${scale}) translate(${position.x}px, ${position.y}px)`,
-            transition: 'transform 0.1s ease-out'
+            transition: 'transform 0.1s ease-out',
+            willChange: 'transform',
           }}
         />
       </div>
@@ -379,7 +382,7 @@ const ProductDetail = () => {
     <div className="min-h-screen bg-white">
       {/* Модальное окно предупреждения о выборе размера */}
       {showSizeWarning && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4" style={{ touchAction: 'none' }}>
           <div className="bg-white rounded-lg shadow-lg p-6 max-w-sm w-full text-center relative">
             <h2 className="text-xl font-bold mb-4 text-black">Пожалуйста, выберите размер</h2>
             <p className="mb-6 text-black">Для оформления предзаказа необходимо выбрать размер товара.</p>
@@ -410,7 +413,8 @@ const ProductDetail = () => {
               window.scrollTo({ top: y, behavior: 'auto' });
             }, 0);
           }}
-          className="absolute top-8 right-4 p-2 text-black opacity-70 hover:opacity-100 hover:bg-transparent z-20"
+          className="absolute top-4 right-2 p-2 text-black opacity-70 hover:opacity-100 hover:bg-transparent z-20"
+          style={{ minWidth: '44px', minHeight: '44px' }}
           aria-label="Close"
         >
           <svg

@@ -151,6 +151,40 @@ const init = async () => {
     camera.y += my - my * factor;
   }, { passive: false });
 
+  // --- Pinch-to-zoom for mobile ---
+  let pinchStartDist = 0;
+  let pinchStartScale = 1;
+  let pinchCenter = { x: 0, y: 0 };
+  canvas.addEventListener('touchstart', e => {
+    if (e.touches.length === 2) {
+      e.preventDefault();
+      dragging = false;
+      const t0 = e.touches[0], t1 = e.touches[1];
+      pinchStartDist = Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY);
+      pinchStartScale = camera.scale;
+      pinchCenter = { x: (t0.clientX + t1.clientX) / 2, y: (t0.clientY + t1.clientY) / 2 };
+    }
+  }, { passive: false });
+  canvas.addEventListener('touchmove', e => {
+    if (e.touches.length === 2) {
+      e.preventDefault();
+      const t0 = e.touches[0], t1 = e.touches[1];
+      const dist = Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY);
+      if (pinchStartDist > 0) {
+        const newScale = pinchStartScale * (dist / pinchStartDist);
+        const cx = (t0.clientX + t1.clientX) / 2;
+        const cy = (t0.clientY + t1.clientY) / 2;
+        const mx = (cx - width/2) / camera.scale - camera.x;
+        const my = (cy - height/2) / camera.scale - camera.y;
+        const factor = newScale / camera.scale;
+        camera.scale = newScale;
+        camera.x += mx - mx * factor;
+        camera.y += my - my * factor;
+      }
+    }
+  }, { passive: false });
+  canvas.addEventListener('touchend', () => { pinchStartDist = 0; });
+
   document.getElementById('reset').addEventListener('click', () => Object.assign(camera, defaultCam));
 
   function applyCamera(){

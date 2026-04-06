@@ -101,11 +101,17 @@ class TelegramBotService
      */
     public function getUpdates(int $offset = 0, int $timeout = 30): array
     {
-        $result = $this->apiCall('getUpdates', [
-            'offset' => $offset,
-            'timeout' => $timeout,
-            'allowed_updates' => ['message'],
-        ]);
+        try {
+            $response = Http::timeout($timeout + 5)->post("{$this->apiUrl}/getUpdates", [
+                'offset' => $offset,
+                'timeout' => $timeout,
+                'allowed_updates' => ['message'],
+            ]);
+            $result = $response->json() ?? [];
+        } catch (\Illuminate\Http\Client\ConnectionException $e) {
+            // Таймаут long-polling — это нормально, новых сообщений просто нет
+            return [];
+        }
 
         return $result['result'] ?? [];
     }
@@ -294,12 +300,9 @@ class TelegramBotService
      */
     private function confirmOrder(int $chatId, array $state): void
     {
-        // Генерируем номер заказа
-        $orderNumber = 'DYN-' . strtoupper(Str::random(6));
-
         try {
             // Сохраняем в БД
-            Order::create([
+            $order = Order::create([
                 'id' => Str::uuid(),
                 'chat_id' => $chatId,
                 'product_id' => $state['product_id'],
@@ -310,7 +313,6 @@ class TelegramBotService
                 'phone' => $state['phone'],
                 'address' => $state['address'],
                 'status' => 'confirmed',
-                'order_number' => $orderNumber,
             ]);
 
             // Очищаем состояние
@@ -319,7 +321,6 @@ class TelegramBotService
             // Сообщение покупателю
             $this->sendMessage($chatId,
                 "Заказ оформлен!\n\n"
-                . "Номер заказа: <b>{$orderNumber}</b>\n"
                 . "Товар: <b>{$state['product_title']}</b> ({$state['size']})\n"
                 . "Цена: <b>{$state['price']}</b>\n\n"
                 . "Мы свяжемся с вами по номеру {$state['phone']} для подтверждения.\n\n"
@@ -330,7 +331,7 @@ class TelegramBotService
             $adminChatId = config('app.telegram_admin_chat_id');
             if ($adminChatId) {
                 $this->sendMessage((int) $adminChatId,
-                    "Новый заказ #{$orderNumber}\n\n"
+                    "Новый заказ\n\n"
                     . "Товар: {$state['product_title']}\n"
                     . "Размер: {$state['size']}\n"
                     . "Цена: {$state['price']}\n\n"

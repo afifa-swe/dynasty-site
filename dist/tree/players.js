@@ -27,6 +27,13 @@
   let flatNodes = [];
   let treeData = [];
 
+  // Мобильная адаптация: уменьшаем размеры на маленьких экранах
+  function isMobile() { return window.innerWidth <= 600; }
+  function getNodeRadius() { return isMobile() ? 16 : 24; }
+  function getLevelHeight() { return isMobile() ? 70 : 100; }
+  function getMinGap() { return isMobile() ? 10 : 16; }
+  function getRootExtraRadius() { return isMobile() ? 5 : 8; }
+
   // === Утилиты ===
 
   function getInitials(name) {
@@ -53,9 +60,9 @@
    * Корень вверху, дети ниже. Используем простой алгоритм Рейнгольда-Тилфорда
    */
   function layoutTree(roots) {
-    const NODE_RADIUS = 24;
-    const LEVEL_HEIGHT = 100;
-    const MIN_GAP = 16;
+    const NODE_RADIUS = getNodeRadius();
+    const LEVEL_HEIGHT = getLevelHeight();
+    const MIN_GAP = getMinGap();
     const flat = [];
     let nextX = 0;
 
@@ -105,7 +112,7 @@
       flat.push({
         ...node,
         x, y,
-        radius: NODE_RADIUS + (depth === 0 ? 8 : 0), // корень чуть больше
+        radius: NODE_RADIUS + (depth === 0 ? getRootExtraRadius() : 0), // корень чуть больше
         depth
       });
 
@@ -394,6 +401,43 @@
     }));
   }, { passive: false });
 
+  // Pinch-to-zoom на overlay (мобильные)
+  let overlayPinchDist = 0;
+  let overlayPinchScale = 1;
+
+  overlay.addEventListener('touchstart', (e) => {
+    if (e.touches.length === 2) {
+      e.preventDefault();
+      dragActive = false;
+      const t0 = e.touches[0], t1 = e.touches[1];
+      overlayPinchDist = Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY);
+      overlayPinchScale = camScale;
+    }
+  }, { passive: false });
+
+  overlay.addEventListener('touchmove', (e) => {
+    if (e.touches.length === 2 && overlayPinchDist > 0) {
+      e.preventDefault();
+      const t0 = e.touches[0], t1 = e.touches[1];
+      const dist = Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY);
+      const newScale = overlayPinchScale * (dist / overlayPinchDist);
+      const cx = (t0.clientX + t1.clientX) / 2;
+      const cy = (t0.clientY + t1.clientY) / 2;
+      const mx = (cx - viewW / 2) / camScale - camX;
+      const my = (cy - viewH / 2) / camScale - camY;
+      const factor = newScale / camScale;
+      camScale = newScale;
+      camX += mx - mx * factor;
+      camY += my - my * factor;
+      renderTree();
+
+      // Синхронизируем canvas
+      canvas.dispatchEvent(new CustomEvent('_pinchSync', { detail: { camX, camY, camScale } }));
+    }
+  }, { passive: false });
+
+  overlay.addEventListener('touchend', () => { overlayPinchDist = 0; });
+
   // Reset view
   document.getElementById('reset').addEventListener('click', () => {
     camX = 0;
@@ -402,10 +446,16 @@
     renderTree();
   });
 
-  // Resize
+  // Resize — пересчитываем раскладку при смене ориентации/размера
+  let lastIsMobile = isMobile();
   window.addEventListener('resize', () => {
     viewW = window.innerWidth;
     viewH = window.innerHeight;
+    const nowMobile = isMobile();
+    if (nowMobile !== lastIsMobile && treeData.length > 0) {
+      lastIsMobile = nowMobile;
+      flatNodes = layoutTree(treeData);
+    }
     renderTree();
   });
 

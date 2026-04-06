@@ -27,6 +27,5 @@ class Order extends Model
         'phone',
         'address',
         'status',
-        'order_number',
     ];
 }

@@ -19,7 +19,6 @@ return new class extends Migration
             $table->string('phone')->nullable();
             $table->text('address')->nullable();
             $table->string('status')->default('pending'); // pending | confirmed | cancelled
-            $table->string('order_number')->unique();
             $table->timestamps();
 
             $table->index('chat_id');
