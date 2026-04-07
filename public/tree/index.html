@@ -16,7 +16,22 @@
     <div class="badge">Dynasty Living Tree</div>
     <div class="controls">
       <button id="reset">Reset View</button>
+      <button id="toggle-leaderboard">Leaderboard</button>
     </div>
+  </div>
+
+  <!-- Рейтинговая таблица (leaderboard) -->
+  <div id="leaderboard-panel" class="leaderboard-panel hidden">
+    <div class="leaderboard-header">
+      <h2 class="leaderboard-title">Leaderboard</h2>
+      <button id="leaderboard-close" class="popup-close">&times;</button>
+    </div>
+    <div class="leaderboard-filters">
+      <button class="lb-filter active" data-filter="all">All</button>
+      <button class="lb-filter" data-filter="darkness">Darkness</button>
+      <button class="lb-filter" data-filter="light">Light</button>
+    </div>
+    <div id="leaderboard-list" class="leaderboard-list"></div>
   </div>
 
   <!-- Оверлей с игроками (SVG поверх Canvas) -->
@@ -48,5 +63,7 @@
   <script src="/tree/tree2d.js"></script>
   <!-- Логика игроков -->
   <script src="/tree/players.js"></script>
+  <!-- Рейтинговая таблица -->
+  <script src="/tree/leaderboard.js"></script>
 </body>
 </html>

@@ -46,7 +46,27 @@
     return name.slice(0, max - 1) + '\u2026';
   }
 
+  /**
+   * Merge multiple roots into a single tree — first root (highest rating)
+   * adopts all orphans so we always render one connected hierarchy.
+   */
+  function mergeRoots(roots) {
+    if (roots.length <= 1) return roots;
+    const main = roots[0];
+    if (!main.children) main.children = [];
+    for (let i = 1; i < roots.length; i++) {
+      main.children.push(roots[i]);
+    }
+    return [main];
+  }
+
+  /**
+   * Reingold-Tilford–style layout: root at top, children spread below.
+   * Returns flat array of positioned nodes.
+   */
   function layoutTree(roots) {
+    roots = mergeRoots(roots);
+
     const NODE_RADIUS = getNodeRadius();
     const LEVEL_HEIGHT = getLevelHeight();
     const MIN_GAP = getMinGap();
@@ -62,7 +82,6 @@
     }
 
     function layout(node, depth, leftBound) {
-      const width = subtreeWidth(node);
       const spacing = (NODE_RADIUS * 2 + MIN_GAP);
 
       if (!node.children || node.children.length === 0) {
@@ -71,10 +90,10 @@
         flat.push({
           ...node,
           x, y,
-          radius: NODE_RADIUS,
+          radius: NODE_RADIUS + (depth === 0 ? getRootExtraRadius() : 0),
           depth
         });
-        return { x, width: spacing };
+        return { x };
       }
 
       let childLeft = leftBound;
@@ -97,25 +116,27 @@
         depth
       });
 
-      return { x, width: width * spacing };
+      return { x };
     }
 
-    let currentLeft = 0;
     const spacing = (NODE_RADIUS * 2 + MIN_GAP);
+    let currentLeft = 0;
     for (const root of roots) {
-      const w = subtreeWidth(root) * spacing;
       layout(root, 0, currentLeft);
-      currentLeft += w + spacing;
+      currentLeft += subtreeWidth(root) * spacing;
     }
 
+    // Center the entire tree at origin
     if (flat.length > 0) {
       const minX = Math.min(...flat.map(n => n.x));
       const maxX = Math.max(...flat.map(n => n.x));
+      const minY = Math.min(...flat.map(n => n.y));
+      const maxY = Math.max(...flat.map(n => n.y));
       const centerX = (minX + maxX) / 2;
-      const offsetY = -80;
+      const centerY = (minY + maxY) / 2;
       for (const node of flat) {
         node.x -= centerX;
-        node.y += offsetY;
+        node.y -= centerY;
       }
     }
 
@@ -125,7 +146,7 @@
   function getCamera() {
     const cam = window._treeCamera;
     if (cam) return cam;
-    return { x: 0, y: -40, scale: 1 };
+    return { x: 0, y: 0, scale: 1 };
   }
 
   function renderTree() {

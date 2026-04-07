@@ -1,16 +1,8 @@
-/**
- * Dynasty Living Tree — слой игроков поверх Canvas-анимации
- * Загружает данные из /api/tree и рисует узлы дерева с SVG
- * Синхронизирует камеру с tree2d.js через window._treeCamera
- */
-
 (function () {
   'use strict';
 
-  // Адрес API бэкенда
   const API_BASE = 'http://127.0.0.1:4000';
 
-  // DOM-элементы
   const overlay = document.getElementById('players-overlay');
   const popup = document.getElementById('player-popup');
   const popupContent = document.getElementById('popup-content');
@@ -21,20 +13,15 @@
   const retryBtn = document.getElementById('retry-btn');
 
   let viewW = window.innerWidth, viewH = window.innerHeight;
-
-  // Массив плоских узлов для рендера
   let flatNodes = [];
   let treeData = [];
 
-  // Мобильная адаптация: уменьшаем размеры на маленьких экранах
   function isMobile() { return window.innerWidth <= 600; }
   function getNodeRadius() { return isMobile() ? 16 : 24; }
   function getLevelHeight() { return isMobile() ? 90 : 120; }
   function getMinGap() { return isMobile() ? 30 : 44; }
   function getRootExtraRadius() { return isMobile() ? 5 : 8; }
   function getMaxNameLength() { return isMobile() ? 8 : 12; }
-
-  // === Утилиты ===
 
   function getInitials(name) {
     return name.split(/\s+/).map(w => w[0]).join('').toUpperCase().slice(0, 2);
@@ -59,9 +46,27 @@
     return name.slice(0, max - 1) + '\u2026';
   }
 
-  // === Раскладка дерева ===
+  /**
+   * Merge multiple roots into a single tree — first root (highest rating)
+   * adopts all orphans so we always render one connected hierarchy.
+   */
+  function mergeRoots(roots) {
+    if (roots.length <= 1) return roots;
+    const main = roots[0];
+    if (!main.children) main.children = [];
+    for (let i = 1; i < roots.length; i++) {
+      main.children.push(roots[i]);
+    }
+    return [main];
+  }
 
+  /**
+   * Reingold-Tilford–style layout: root at top, children spread below.
+   * Returns flat array of positioned nodes.
+   */
   function layoutTree(roots) {
+    roots = mergeRoots(roots);
+
     const NODE_RADIUS = getNodeRadius();
     const LEVEL_HEIGHT = getLevelHeight();
     const MIN_GAP = getMinGap();
@@ -77,7 +82,6 @@
     }
 
     function layout(node, depth, leftBound) {
-      const width = subtreeWidth(node);
       const spacing = (NODE_RADIUS * 2 + MIN_GAP);
 
       if (!node.children || node.children.length === 0) {
@@ -86,10 +90,10 @@
         flat.push({
           ...node,
           x, y,
-          radius: NODE_RADIUS,
+          radius: NODE_RADIUS + (depth === 0 ? getRootExtraRadius() : 0),
           depth
         });
-        return { x, width: spacing };
+        return { x };
       }
 
       let childLeft = leftBound;
@@ -112,37 +116,37 @@
         depth
       });
 
-      return { x, width: width * spacing };
+      return { x };
     }
 
-    let currentLeft = 0;
     const spacing = (NODE_RADIUS * 2 + MIN_GAP);
+    let currentLeft = 0;
     for (const root of roots) {
-      const w = subtreeWidth(root) * spacing;
       layout(root, 0, currentLeft);
-      currentLeft += w + spacing;
+      currentLeft += subtreeWidth(root) * spacing;
     }
 
+    // Center the entire tree at origin
     if (flat.length > 0) {
       const minX = Math.min(...flat.map(n => n.x));
       const maxX = Math.max(...flat.map(n => n.x));
+      const minY = Math.min(...flat.map(n => n.y));
+      const maxY = Math.max(...flat.map(n => n.y));
       const centerX = (minX + maxX) / 2;
-      const offsetY = -80;
+      const centerY = (minY + maxY) / 2;
       for (const node of flat) {
         node.x -= centerX;
-        node.y += offsetY;
+        node.y -= centerY;
       }
     }
 
     return flat;
   }
 
-  // === Рендер SVG (читает камеру из tree2d.js) ===
-
   function getCamera() {
     const cam = window._treeCamera;
     if (cam) return cam;
-    return { x: 0, y: -40, scale: 1 };
+    return { x: 0, y: 0, scale: 1 };
   }
 
   function renderTree() {
@@ -160,13 +164,11 @@
     const ty = viewH / 2 + cam.y * cam.scale;
     g.setAttribute('transform', `translate(${tx}, ${ty}) scale(${cam.scale})`);
 
-    // Карта id -> позиция для линий
     const posMap = {};
     for (const node of flatNodes) {
       posMap[node.id] = { x: node.x, y: node.y };
     }
 
-    // Линии связей
     for (const node of flatNodes) {
       if (node.parent_id && posMap[node.parent_id]) {
         const parent = posMap[node.parent_id];
@@ -178,7 +180,6 @@
       }
     }
 
-    // Узлы
     for (const node of flatNodes) {
       const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
       group.setAttribute('class', 'tree-node');
@@ -249,13 +250,10 @@
     overlay.appendChild(svg);
   }
 
-  // === Анимационный цикл — синхронизация с камерой tree2d.js ===
-
   let lastCamX = NaN, lastCamY = NaN, lastCamScale = NaN;
 
   function syncLoop() {
     const cam = getCamera();
-    // Перерисовываем только если камера изменилась
     if (cam.x !== lastCamX || cam.y !== lastCamY || cam.scale !== lastCamScale) {
       lastCamX = cam.x;
       lastCamY = cam.y;
@@ -264,8 +262,6 @@
     }
     requestAnimationFrame(syncLoop);
   }
-
-  // === Попап профиля ===
 
   function showPopup(node) {
     const avatarHtml = node.avatar_url
@@ -334,13 +330,8 @@
     if (e.key === 'Escape') hidePopup();
   });
 
-  // === Overlay не перехватывает события — пропускает на canvas ===
   overlay.style.pointerEvents = 'none';
 
-  // Reset view — синхронизируется автоматически через syncLoop
-  // (tree2d.js обрабатывает Reset и обновляет camera)
-
-  // Resize
   let lastIsMobile = isMobile();
   window.addEventListener('resize', () => {
     viewW = window.innerWidth;
@@ -352,8 +343,6 @@
     }
     renderTree();
   });
-
-  // === Загрузка данных ===
 
   function showLoading() {
     loadingOverlay.classList.remove('hidden');
@@ -384,11 +373,8 @@
       }
 
       flatNodes = layoutTree(treeData);
-
       hideLoading();
       renderTree();
-
-      // Запускаем цикл синхронизации камеры
       syncLoop();
     } catch (err) {
       console.error('Failed to load tree:', err);
@@ -397,13 +383,6 @@
   }
 
   retryBtn.addEventListener('click', loadTree);
-
-  // Запуск
   loadTree();
-
-  // Обработка кликов по узлам через делегирование (overlay pointer-events: none,
-  // но SVG-узлы имеют pointer-events: all через CSS)
-  // Пробрасываем клики с canvas на overlay для перехвата кликов по узлам
-  // Вместо этого слушаем клик на document и проверяем координаты
 
 })();

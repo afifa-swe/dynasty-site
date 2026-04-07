@@ -160,6 +160,10 @@ class RatingService
 
             $nickname = $data['nickname'] ?? 'player-' . Str::random(6);
 
+            // Авто-прикрепление к дереву: новый игрок становится
+            // ребёнком наименее загруженного узла (сбалансированное дерево)
+            $parentId = $data['parent_id'] ?? $this->findBestParent();
+
             $player = Player::create([
                 'id' => Str::uuid(),
                 'nickname' => $nickname,
@@ -168,6 +172,7 @@ class RatingService
                 'tier' => 'treasure',
                 'avatar' => "https://api.dicebear.com/7.x/adventurer/svg?seed=" . urlencode($nickname),
                 'join_date' => now(),
+                'parent_id' => $parentId,
             ]);
         }
 
@@ -318,6 +323,17 @@ class RatingService
             }
         }
 
+        // Если несколько корней — объединить orphan-узлы под главный корень
+        // (игрок с наивысшим рейтингом). Это гарантирует единое дерево.
+        if (count($roots) > 1) {
+            $mainRoot = $roots[0]; // уже отсортированы по rating DESC
+            $orphans = array_slice($roots, 1);
+            foreach ($orphans as $orphanId) {
+                $childrenMap[$mainRoot][] = $orphanId;
+            }
+            $roots = [$mainRoot];
+        }
+
         $buildNode = function (string $id) use (&$buildNode, $byId, $childrenMap): array {
             $player = $byId[$id];
             $node = [
@@ -342,6 +358,44 @@ class RatingService
         };
 
         return array_map($buildNode, $roots);
+    }
+
+    /**
+     * Найти лучшего родителя для нового игрока — узел с наименьшим
+     * числом прямых детей (BFS по уровням, сбалансированное дерево).
+     */
+    private function findBestParent(): ?string
+    {
+        $players = Player::select('id', 'parent_id')->get();
+        if ($players->isEmpty()) {
+            return null;
+        }
+
+        // Посчитать кол-во прямых детей каждого узла
+        $childrenCount = [];
+        foreach ($players as $p) {
+            $childrenCount[$p->id] = 0;
+        }
+        foreach ($players as $p) {
+            if ($p->parent_id && isset($childrenCount[$p->parent_id])) {
+                $childrenCount[$p->parent_id]++;
+            }
+        }
+
+        // Вернуть игрока с наименьшим числом детей (предпочтение игрокам
+        // с более высоким рейтингом при равенстве — ORDER BY rating DESC)
+        $bestId = null;
+        $bestCount = PHP_INT_MAX;
+        $playersWithRating = Player::select('id', 'rating')->orderByDesc('rating')->get();
+        foreach ($playersWithRating as $p) {
+            $cnt = $childrenCount[$p->id] ?? 0;
+            if ($cnt < $bestCount) {
+                $bestCount = $cnt;
+                $bestId = $p->id;
+            }
+        }
+
+        return $bestId;
     }
 
     private function normalizePhone(string $phone): string
