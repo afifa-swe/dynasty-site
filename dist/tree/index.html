@@ -26,6 +26,9 @@
       <h2 class="leaderboard-title">Leaderboard</h2>
       <button id="leaderboard-close" class="popup-close">&times;</button>
     </div>
+    <div class="leaderboard-search">
+      <input id="lb-search" type="text" placeholder="Search by nickname…" autocomplete="off" />
+    </div>
     <div class="leaderboard-filters">
       <button class="lb-filter active" data-filter="all">All</button>
       <button class="lb-filter" data-filter="darkness">Darkness</button>
@@ -58,6 +61,9 @@
       <button id="retry-btn" class="retry-btn">Retry</button>
     </div>
   </div>
+
+  <!-- API config: override for local dev, empty = same origin in production -->
+  <script>window.DYNASTY_API_BASE = '';</script>
 
   <!-- Фоновая анимация -->
   <script src="/tree/tree2d.js"></script>

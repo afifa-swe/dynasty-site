@@ -347,6 +347,7 @@ class RatingService
                 'achievements' => $player->achievements ?? [],
                 'purchases' => $player->purchases_count,
                 'parent_id' => $player->parent_id,
+                'join_date' => $player->join_date?->toIso8601String(),
                 'children' => [],
             ];
 

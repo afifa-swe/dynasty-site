@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  const API_BASE = 'http://127.0.0.1:4000';
+  const API_BASE = window.DYNASTY_API_BASE || '';
 
   const panel = document.getElementById('leaderboard-panel');
   const listEl = document.getElementById('leaderboard-list');
@@ -9,8 +9,11 @@
   const closeBtn = document.getElementById('leaderboard-close');
   const filterBtns = document.querySelectorAll('.lb-filter');
 
+  const searchInput = document.getElementById('lb-search');
+
   let players = [];
   let currentFilter = 'all';
+  let searchQuery = '';
   let isOpen = false;
 
   function getInitials(name) {
@@ -48,9 +51,14 @@
   }
 
   function renderList() {
-    const filtered = currentFilter === 'all'
+    let filtered = currentFilter === 'all'
       ? players
       : players.filter(p => p.faction === currentFilter);
+
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      filtered = filtered.filter(p => p.nickname.toLowerCase().includes(q));
+    }
 
     if (filtered.length === 0) {
       listEl.innerHTML = '<div style="text-align:center;color:#666;padding:40px 0;font-size:14px">No players found</div>';
@@ -86,6 +94,35 @@
         </div>
       `;
     }).join('');
+
+    // Attach click handlers to open player popup
+    listEl.querySelectorAll('.lb-row').forEach(row => {
+      row.addEventListener('click', () => {
+        const id = row.dataset.id;
+        const showPopup = window._dynastyShowPopup;
+        if (!showPopup) return;
+
+        // Try tree data first (has join_date), fallback to leaderboard data
+        const getPlayers = window._dynastyGetPlayers;
+        const treePlayer = getPlayers ? getPlayers().find(p => p.id === id) : null;
+        const lbPlayer = players.find(p => p.id === id);
+        const src = treePlayer || lbPlayer;
+        if (!src) return;
+
+        showPopup({
+          id: src.id,
+          name: src.name || src.nickname,
+          rank: src.rank,
+          rating: src.rating,
+          faction: src.faction,
+          tier: src.tier,
+          avatar_url: src.avatar_url || src.avatar,
+          achievements: src.achievements || [],
+          purchases: src.purchases || src.purchases_count || 0,
+          join_date: src.join_date || null,
+        });
+      });
+    });
   }
 
   async function loadLeaderboard() {
@@ -101,11 +138,22 @@
     }
   }
 
+  const LB_POLL_INTERVAL = 15000;
+  let lbPollTimer = null;
+
+  function startLbPolling() {
+    if (lbPollTimer) return;
+    lbPollTimer = setInterval(() => {
+      if (isOpen) loadLeaderboard();
+    }, LB_POLL_INTERVAL);
+  }
+
   function toggle() {
     isOpen = !isOpen;
     if (isOpen) {
       panel.classList.remove('hidden');
       loadLeaderboard();
+      startLbPolling();
     } else {
       panel.classList.add('hidden');
     }
@@ -125,6 +173,12 @@
       currentFilter = btn.dataset.filter;
       renderList();
     });
+  });
+
+  // Search input
+  searchInput.addEventListener('input', () => {
+    searchQuery = searchInput.value.trim();
+    renderList();
   });
 
   // Close on Escape

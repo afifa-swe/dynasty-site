@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  const API_BASE = 'http://127.0.0.1:4000';
+  const API_BASE = window.DYNASTY_API_BASE || '';
 
   const overlay = document.getElementById('players-overlay');
   const popup = document.getElementById('player-popup');
@@ -15,6 +15,7 @@
   let viewW = window.innerWidth, viewH = window.innerHeight;
   let flatNodes = [];
   let treeData = [];
+  let allPlayers = [];
 
   function isMobile() { return window.innerWidth <= 600; }
   function getNodeRadius() { return isMobile() ? 16 : 24; }
@@ -40,6 +41,12 @@
     return faction === 'darkness' ? 'Darkness' : 'Light';
   }
 
+  function formatDate(iso) {
+    if (!iso) return '—';
+    const d = new Date(iso);
+    return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' });
+  }
+
   function truncateName(name) {
     const max = getMaxNameLength();
     if (name.length <= max) return name;
@@ -47,17 +54,47 @@
   }
 
   /**
-   * Merge multiple roots into a single tree — first root (highest rating)
-   * adopts all orphans so we always render one connected hierarchy.
+   * Flatten nested API tree into a plain array of player objects.
    */
-  function mergeRoots(roots) {
-    if (roots.length <= 1) return roots;
-    const main = roots[0];
-    if (!main.children) main.children = [];
-    for (let i = 1; i < roots.length; i++) {
-      main.children.push(roots[i]);
+  function flattenApiTree(nodes) {
+    const result = [];
+    function walk(node) {
+      const { children, ...player } = node;
+      result.push(player);
+      if (children && children.length) {
+        for (const child of children) walk(child);
+      }
     }
-    return [main];
+    for (const root of nodes) walk(root);
+    return result;
+  }
+
+  /**
+   * Build a balanced tree ordered by rating (highest = root at top).
+   * Branching factor of 3 gives a visually appealing dynasty shape.
+   * Each node gets a _visualParentId for edge drawing.
+   */
+  function buildRatingTree(players) {
+    const sorted = [...players].sort((a, b) => b.rating - a.rating);
+    if (sorted.length === 0) return [];
+
+    const BRANCH_FACTOR = 3;
+    const nodes = sorted.map(p => ({ ...p, children: [], _visualParentId: null }));
+
+    const queue = [nodes[0]];
+    let idx = 1;
+
+    while (idx < nodes.length && queue.length > 0) {
+      const parent = queue.shift();
+      for (let i = 0; i < BRANCH_FACTOR && idx < nodes.length; i++) {
+        nodes[idx]._visualParentId = parent.id;
+        parent.children.push(nodes[idx]);
+        queue.push(nodes[idx]);
+        idx++;
+      }
+    }
+
+    return [nodes[0]];
   }
 
   /**
@@ -65,7 +102,6 @@
    * Returns flat array of positioned nodes.
    */
   function layoutTree(roots) {
-    roots = mergeRoots(roots);
 
     const NODE_RADIUS = getNodeRadius();
     const LEVEL_HEIGHT = getLevelHeight();
@@ -143,16 +179,67 @@
     return flat;
   }
 
+  // --- Animation state for smooth transitions ---
+  let prevPositions = {};
+  let animating = false;
+  let animStart = 0;
+  const ANIM_DURATION = 600;
+
+  function easeInOutQuad(t) {
+    return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+  }
+
+  function getAnimatedPos(node) {
+    if (!animating) return { x: node.x, y: node.y };
+    const elapsed = performance.now() - animStart;
+    const t = easeInOutQuad(Math.min(1, elapsed / ANIM_DURATION));
+    const old = prevPositions[node.id];
+    if (!old) return { x: node.x, y: node.y };
+    return {
+      x: old.x + (node.x - old.x) * t,
+      y: old.y + (node.y - old.y) * t,
+    };
+  }
+
+  /** Call when flatNodes changes from polling to trigger smooth transition */
+  function applyNewLayout(newFlatNodes) {
+    const oldPos = {};
+    for (const n of flatNodes) oldPos[n.id] = { x: n.x, y: n.y };
+
+    flatNodes = newFlatNodes;
+
+    // Check if any positions actually moved
+    let moved = false;
+    for (const n of flatNodes) {
+      const o = oldPos[n.id];
+      if (!o || Math.abs(o.x - n.x) > 0.5 || Math.abs(o.y - n.y) > 0.5) {
+        moved = true; break;
+      }
+    }
+
+    if (moved && Object.keys(oldPos).length > 0) {
+      prevPositions = oldPos;
+      animating = true;
+      animStart = performance.now();
+    }
+  }
+
   function getCamera() {
     const cam = window._treeCamera;
     if (cam) return cam;
     return { x: 0, y: 0, scale: 1 };
   }
 
+  // Zoom thresholds for progressive detail
+  const ZOOM_SHOW_NAMES = 0.6;
+  const ZOOM_SHOW_RATING = 0.8;
+  const ZOOM_SHOW_BADGES = 0.7;
+
   function renderTree() {
     if (!flatNodes.length) return;
 
     const cam = getCamera();
+    const scale = cam.scale || 1;
 
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svg.setAttribute('viewBox', `0 0 ${viewW} ${viewH}`);
@@ -166,29 +253,33 @@
 
     const posMap = {};
     for (const node of flatNodes) {
-      posMap[node.id] = { x: node.x, y: node.y };
+      const pos = getAnimatedPos(node);
+      posMap[node.id] = pos;
     }
 
     for (const node of flatNodes) {
-      if (node.parent_id && posMap[node.parent_id]) {
-        const parent = posMap[node.parent_id];
+      const vizParent = node._visualParentId || node.parent_id;
+      if (vizParent && posMap[vizParent]) {
+        const p = posMap[vizParent];
+        const c = posMap[node.id];
         const line = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-        const midY = (parent.y + node.y) / 2;
-        line.setAttribute('d', `M ${parent.x} ${parent.y + 24} C ${parent.x} ${midY}, ${node.x} ${midY}, ${node.x} ${node.y - 24}`);
+        const midY = (p.y + c.y) / 2;
+        line.setAttribute('d', `M ${p.x} ${p.y + 24} C ${p.x} ${midY}, ${c.x} ${midY}, ${c.x} ${c.y - 24}`);
         line.setAttribute('class', 'tree-edge');
         g.appendChild(line);
       }
     }
 
     for (const node of flatNodes) {
+      const pos = posMap[node.id];
       const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
       group.setAttribute('class', 'tree-node');
       group.setAttribute('data-id', node.id);
       group.style.cursor = 'pointer';
 
       const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-      circle.setAttribute('cx', node.x);
-      circle.setAttribute('cy', node.y);
+      circle.setAttribute('cx', pos.x);
+      circle.setAttribute('cy', pos.y);
       circle.setAttribute('r', node.radius);
       circle.setAttribute('class', `node-circle ${node.tier}`);
       group.appendChild(circle);
@@ -196,8 +287,8 @@
       if (node.avatar_url) {
         const img = document.createElementNS('http://www.w3.org/2000/svg', 'image');
         img.setAttribute('href', node.avatar_url);
-        img.setAttribute('x', node.x - node.radius + 4);
-        img.setAttribute('y', node.y - node.radius + 4);
+        img.setAttribute('x', pos.x - node.radius + 4);
+        img.setAttribute('y', pos.y - node.radius + 4);
         img.setAttribute('width', (node.radius - 4) * 2);
         img.setAttribute('height', (node.radius - 4) * 2);
         img.setAttribute('clip-path', `circle(${node.radius - 4}px at ${node.radius - 4}px ${node.radius - 4}px)`);
@@ -206,30 +297,34 @@
       }
 
       const initials = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-      initials.setAttribute('x', node.x);
-      initials.setAttribute('y', node.y);
+      initials.setAttribute('x', pos.x);
+      initials.setAttribute('y', pos.y);
       initials.setAttribute('class', 'node-initials');
       initials.textContent = getInitials(node.name);
       group.appendChild(initials);
 
-      const nameEl = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-      nameEl.setAttribute('x', node.x);
-      nameEl.setAttribute('y', node.y + node.radius + 14);
-      nameEl.setAttribute('class', 'node-name');
-      nameEl.textContent = truncateName(node.name);
-      group.appendChild(nameEl);
+      if (scale >= ZOOM_SHOW_NAMES) {
+        const nameEl = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        nameEl.setAttribute('x', pos.x);
+        nameEl.setAttribute('y', pos.y + node.radius + 14);
+        nameEl.setAttribute('class', 'node-name');
+        nameEl.textContent = truncateName(node.name);
+        group.appendChild(nameEl);
+      }
 
-      const ratingEl = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-      ratingEl.setAttribute('x', node.x);
-      ratingEl.setAttribute('y', node.y + node.radius + 26);
-      ratingEl.setAttribute('class', 'node-rating');
-      ratingEl.textContent = formatNumber(node.rating) + ' pts';
-      group.appendChild(ratingEl);
+      if (scale >= ZOOM_SHOW_RATING) {
+        const ratingEl = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        ratingEl.setAttribute('x', pos.x);
+        ratingEl.setAttribute('y', pos.y + node.radius + 26);
+        ratingEl.setAttribute('class', 'node-rating');
+        ratingEl.textContent = formatNumber(node.rating) + ' pts';
+        group.appendChild(ratingEl);
+      }
 
-      if (node.rank <= 3) {
+      if (node.rank <= 3 && scale >= ZOOM_SHOW_BADGES) {
         const rankBadge = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-        rankBadge.setAttribute('x', node.x + node.radius - 2);
-        rankBadge.setAttribute('y', node.y - node.radius + 6);
+        rankBadge.setAttribute('x', pos.x + node.radius - 2);
+        rankBadge.setAttribute('y', pos.y - node.radius + 6);
         rankBadge.setAttribute('class', 'node-rank-badge');
         const medals = { 1: '\u{1F451}', 2: '\u{1F948}', 3: '\u{1F949}' };
         rankBadge.textContent = medals[node.rank] || `#${node.rank}`;
@@ -254,11 +349,17 @@
 
   function syncLoop() {
     const cam = getCamera();
-    if (cam.x !== lastCamX || cam.y !== lastCamY || cam.scale !== lastCamScale) {
+    const camChanged = cam.x !== lastCamX || cam.y !== lastCamY || cam.scale !== lastCamScale;
+
+    if (camChanged || animating) {
       lastCamX = cam.x;
       lastCamY = cam.y;
       lastCamScale = cam.scale;
       renderTree();
+
+      if (animating && performance.now() - animStart >= ANIM_DURATION) {
+        animating = false;
+      }
     }
     requestAnimationFrame(syncLoop);
   }
@@ -301,8 +402,8 @@
           <div class="popup-stat-value">${node.purchases || 0}</div>
         </div>
         <div class="popup-stat">
-          <div class="popup-stat-label">Faction</div>
-          <div class="popup-stat-value" style="color: var(--${node.faction})">${factionLabel(node.faction)}</div>
+          <div class="popup-stat-label">Joined</div>
+          <div class="popup-stat-value" style="font-size:13px">${formatDate(node.join_date)}</div>
         </div>
       </div>
       ${achievementsHtml}
@@ -359,30 +460,62 @@
     errorOverlay.classList.remove('hidden');
   }
 
-  async function loadTree() {
+
+  const POLL_INTERVAL = 15000;
+  let pollTimer = null;
+  let syncLoopStarted = false;
+
+  async function pollTree() {
+    try {
+      const response = await fetch(`${API_BASE}/api/tree`);
+      if (!response.ok) return;
+      const apiData = await response.json();
+      if (!Array.isArray(apiData) || apiData.length === 0) return;
+
+      allPlayers = flattenApiTree(apiData);
+      treeData = buildRatingTree(allPlayers);
+      const newLayout = layoutTree(treeData);
+      applyNewLayout(newLayout); // triggers smooth transition
+      renderTree();
+    } catch (_) { /* silent — next poll will retry */ }
+  }
+
+  function startPolling() {
+    if (pollTimer) return;
+    pollTimer = setInterval(pollTree, POLL_INTERVAL);
+  }
+
+  async function initialLoad() {
     showLoading();
     try {
       const response = await fetch(`${API_BASE}/api/tree`);
       if (!response.ok) {
         throw new Error(`Server returned ${response.status} ${response.statusText}`);
       }
-      treeData = await response.json();
+      const apiData = await response.json();
 
-      if (!Array.isArray(treeData) || treeData.length === 0) {
+      if (!Array.isArray(apiData) || apiData.length === 0) {
         throw new Error('No players found in the dynasty tree');
       }
 
+      allPlayers = flattenApiTree(apiData);
+      treeData = buildRatingTree(allPlayers);
       flatNodes = layoutTree(treeData);
       hideLoading();
       renderTree();
-      syncLoop();
+      if (!syncLoopStarted) { syncLoopStarted = true; syncLoop(); }
+      startPolling();
     } catch (err) {
       console.error('Failed to load tree:', err);
       showError(err.message || 'Network error');
     }
   }
 
-  retryBtn.addEventListener('click', loadTree);
-  loadTree();
+  // Expose for leaderboard cross-module communication
+  window._dynastyShowPopup = showPopup;
+  window._dynastyGetPlayers = function () { return allPlayers; };
+
+  retryBtn.addEventListener('click', initialLoad);
+  initialLoad();
 
 })();

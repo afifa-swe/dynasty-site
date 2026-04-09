@@ -364,6 +364,22 @@ html,body{
   color: var(--gold);
   letter-spacing: .03em;
 }
+.leaderboard-search{
+  padding: 10px 20px 0;
+}
+.leaderboard-search input{
+  width: 100%; padding: 8px 12px;
+  background: rgba(255,255,255,.04);
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 8px;
+  color: #eee; font-size: 13px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.leaderboard-search input::placeholder{ color: #666; }
+.leaderboard-search input:focus{
+  border-color: rgba(247,194,113,.4);
+}
 .leaderboard-filters{
   display: flex; gap: 6px;
   padding: 10px 20px;
